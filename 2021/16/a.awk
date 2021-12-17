@@ -8,43 +8,49 @@ function bin2dec(bin,	i, bit, dec) {
 	return dec
 }
 
-function unpack(packet,	version, id, val, type, len) {
+function unpack(packet, extend, count,		i, version, id, val, type, len) {
 	version = bin2dec(substr(packet, 1, 3))
 	id = bin2dec(substr(packet, 4, 3))
+	total += version
 
-	print version, id
-
-	if (ptr > 0) {
-		if (--stack[ptr] == 0) {
-			ptr -= 1
-		}
-	}
+	i = 7
 
 	if (id == 4) {
-		for (i = 7 ;; i += 5) {
+		while (1) {
 			val = val substr(packet, i+1, 4)
-			if (substr(packet, i, 1) == 0) {
+			i += 5
+
+			if (substr(packet, i-5, 1) == 0) {
 				break
 			}
 		}
 
-		# 2021
-		print bin2dec(val)
-
+		val = bin2dec(val)
 	} else {
 		type = substr(packet, 7, 1)
 
 		if (type == 0) {
 			len = bin2dec(substr(packet, 8, 15))
-			print len
-			print substr(packet, 23, len)
-			unpack(substr(packet, 23, len))
+			i += 1+15
+			i += unpack(substr(packet, 23, len), 1, 0)
 		} else if (type == 1) {
-			stack[++ptr] = bin2dec(substr(packet, 8, 11))
-			print len
-			unpack(packet)
+			count = bin2dec(substr(packet, 8, 11))
+			i += 1+11
 		}
 	}
+
+	if (count > 0) {
+		count -= 1
+		i += unpack(substr(packet, i), 0, count)
+	}
+
+	if (extend) {
+		if (length(substr(packet, i))) {
+			i += unpack(substr(packet, i), extend, 0)
+		}
+	}
+
+	return i
 }
 
 BEGIN {
@@ -71,10 +77,9 @@ BEGIN {
 	for (i = 1; i <= NF; ++i) {
 		packet = packet trans[$i]
 	}
-
-	print packet
 }
 
 END {
 	unpack(packet)
+	print total
 }
